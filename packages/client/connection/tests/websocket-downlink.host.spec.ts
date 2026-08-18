@@ -317,4 +317,28 @@ describe('WebSocket downlinks', () => {
     // terminate() closes abnormally; a pong-answering client would survive.
     expect(code).toBe(1006)
   })
+
+  it('keeps a pong-answering client alive across heartbeat ticks', async () => {
+    const downlinks = new WebSocketDownlinks(api(idle, idle), { heartbeatIntervalMs: 50 })
+    const host = await serve(downlinks)
+    running.push(host.close)
+    const socket = new WebSocket(`${host.origin}${MUX_EVENTS_PATH}`)
+    await once(socket, 'open')
+    const accepted = await acceptedSocket(downlinks)
+    // Outlive several ticks: the default autoPong client answers every ping.
+    await new Promise(resolve => setTimeout(resolve, 250))
+    expect(socket.readyState).toBe(WebSocket.OPEN)
+    expect(accepted.readyState).toBe(WebSocket.OPEN)
+  })
+
+  it('stops the heartbeat when closed', async () => {
+    const clearSpy = vi.spyOn(globalThis, 'clearInterval')
+    const downlinks = new WebSocketDownlinks(api(idle, idle), { heartbeatIntervalMs: 50 })
+    const host = await serve(downlinks)
+    const socket = new WebSocket(`${host.origin}${MUX_EVENTS_PATH}`)
+    await once(socket, 'open')
+    await host.close()
+    expect(clearSpy).toHaveBeenCalled()
+    clearSpy.mockRestore()
+  })
 })
