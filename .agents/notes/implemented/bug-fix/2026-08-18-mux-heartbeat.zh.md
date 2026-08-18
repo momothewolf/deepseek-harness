@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision（决策）
 
-`dsh-client-connection` 在其两条下行 WebSocket（`/api/events.mux`、`/api/events.host`）上运行服务端心跳：每个 `heartbeatIntervalMs`（新增 `ConnectionConfig` 配置项，默认 30 秒）服务端 ping 每个已接受的 socket，连续两次未收到 pong 的连接将被终止。浏览器在协议层自动回 pong（RFC 6455），因此客户端代码无需改动。`terminate()` 会在浏览器触发 `close`，既有 `ConnectionController` 重连循环按退避策略重新打开两条流，既有 mux-open 重放把仍未决的提问与审批重新送达——提问卡片出现，会话继续。只漏掉一次 ping 的 socket（睡眠唤醒、瞬时抖动）不会被误杀：两拍宽容是算法常量，节奏则由部署配置决定。
+`dsh-client-connection` 在其两条下行 WebSocket（`/api/events.mux`、`/api/events.host`）上运行服务端心跳：每个 `heartbeatIntervalMs`（新增 `ConnectionConfig` 配置项，默认 30 秒）服务端 ping 每个已接受的 socket，未收到一次 pong 的 socket 将在下一个心跳 tick 被终止（新连接从建立起有 2 个 tick 的宽限）。浏览器在协议层自动回 pong（RFC 6455），因此客户端代码无需改动。`terminate()` 会在浏览器触发 `close`，既有 `ConnectionController` 重连循环按退避策略重新打开两条流，既有 mux-open 重放把仍未决的提问与审批重新送达——提问卡片出现，会话继续。新连接从建立起有 2 个 tick 的宽限，终止才会发生；宽限是算法常量，节奏则由部署配置决定。
 
 ## Alternatives considered（备选方案）
 

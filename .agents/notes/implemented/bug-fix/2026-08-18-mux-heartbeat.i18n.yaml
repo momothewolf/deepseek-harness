@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-mux-heartbeat.md
-2026-08-18-mux-heartbeat.md: 3f5683cc85daaee61f8a55d1e65b7e4d927b7aef
-2026-08-18-mux-heartbeat.zh.md: 1e1481fdf54ecb003cba5f03c859fb160c71391d
+2026-08-18-mux-heartbeat.md: f9a0cbe5d4055e45236484a1caa2c742eb8fa325
+2026-08-18-mux-heartbeat.zh.md: 16a7052f57594e96c501709cb5baca828f73ecd7

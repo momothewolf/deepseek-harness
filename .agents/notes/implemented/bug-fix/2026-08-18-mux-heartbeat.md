@@ -22,14 +22,15 @@ the question card never renders and the turn stalls indefinitely.
 `dsh-client-connection` runs a server-side heartbeat on its two
 downlink WebSockets (`/api/events.mux`, `/api/events.host`): every
 `heartbeatIntervalMs` (new `ConnectionConfig` key, default 30 s) the
-server pings each accepted socket and terminates any socket that misses
-two consecutive pongs. The browser auto-pongs at the protocol level (RFC
+server pings each accepted socket and terminates any socket that fails
+one pong on the next heartbeat tick (a fresh socket gets two ticks of
+grace from connect). The browser auto-pongs at the protocol level (RFC
 6455), so the client code is unchanged. `terminate()` fires `close` in
 the browser, the existing `ConnectionController` reconnect loop re-opens
 both streams under its backoff policy, and the existing mux-open replay
 re-delivers still-pending questions and approvals — the question card
-appears and the session continues. A socket that missed only one ping
-(sleep wake, transient stall) survives: the two-beat grace is an
+appears and the session continues. A fresh socket gets two ticks of
+grace from connect before any termination can occur; the grace is an
 algorithm constant, while the cadence is deployment-configurable.
 
 ## Alternatives considered
