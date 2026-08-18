@@ -43,6 +43,21 @@ function failureFrame(error: unknown): RpcRequest<Frame> {
   }
 }
 
+/** Heartbeat ping interval when the caller does not configure one. */
+export const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000
+
+/** Constructor options for {@link WebSocketDownlinks}. */
+export interface WebSocketDownlinksOptions {
+  /**
+   * Heartbeat ping interval in milliseconds. The server pings every accepted
+   * socket on this cadence and terminates any socket that misses two
+   * consecutive pongs — a silently dead connection the browser has not yet
+   * noticed. The resulting close drives the browser's existing reconnect
+   * loop, whose mux-open replay re-delivers still-pending interactions.
+   */
+  heartbeatIntervalMs?: number
+}
+
 /**
  * Owns WebSocket negotiation and frame pumping for the connection plugin's
  * two downlinks. Client messages are a protocol violation: upstream traffic
@@ -51,9 +66,34 @@ function failureFrame(error: unknown): RpcRequest<Frame> {
 export class WebSocketDownlinks {
   private readonly server = new WebSocketServer({ noServer: true })
   private readonly pumps = new Set<Promise<void>>()
+  /** Sockets that answered their latest ping; absence means "terminate". */
+  private readonly alive = new WeakSet<WebSocket>()
+  private readonly heartbeat: ReturnType<typeof setInterval>
 
-  /** @param api - host API supplying the typed event streams. */
-  constructor(private readonly api: ApiProxy) {}
+  /**
+   * @param api - host API supplying the typed event streams.
+   * @param options - heartbeat tuning.
+   */
+  constructor(
+    private readonly api: ApiProxy,
+    options: WebSocketDownlinksOptions = {},
+  ) {
+    const intervalMs = options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS
+    // Two-beat grace: tick 1 pings and marks the socket not-alive; tick 2
+    // terminates it unless a pong arrived. A socket that missed one ping
+    // (sleep wake, transient stall) survives; a dead one is reaped on the
+    // second tick.
+    this.heartbeat = setInterval(() => {
+      for (const socket of this.server.clients) {
+        if (!this.alive.has(socket)) {
+          socket.terminate()
+          continue
+        }
+        this.alive.delete(socket)
+        socket.ping()
+      }
+    }, intervalMs)
+  }
 
   /**
    * Upgrade one socket and pump the mux stream until either side closes.
@@ -86,6 +126,7 @@ export class WebSocketDownlinks {
    * @returns A promise resolving after every socket and source iterator stops.
    */
   async close(): Promise<void> {
+    clearInterval(this.heartbeat)
     for (const socket of this.server.clients) socket.terminate()
     await new Promise<void>((resolve, reject) => {
       this.server.close((error) => {
@@ -109,6 +150,10 @@ export class WebSocketDownlinks {
       websocket.once('message', () => {
         websocket.close(1008, 'downlink only')
       })
+      // Heartbeat liveness: a pong proves the peer is reachable; the initial
+      // add gives a fresh socket one missed ping before it can be terminated.
+      websocket.on('pong', () => { this.alive.add(websocket) })
+      this.alive.add(websocket)
       const pump = this.pump(websocket, open(abort.signal), abort)
       this.pumps.add(pump)
       void pump.then(() => { this.pumps.delete(pump) })

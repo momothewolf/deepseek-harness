@@ -305,4 +305,16 @@ describe('WebSocket downlinks', () => {
       await closing
     }
   })
+
+  it('terminates a client that does not answer pings', async () => {
+    const downlinks = new WebSocketDownlinks(api(idle, idle), { heartbeatIntervalMs: 50 })
+    const host = await serve(downlinks)
+    running.push(host.close)
+    const socket = new WebSocket(`${host.origin}${MUX_EVENTS_PATH}`, { autoPong: false })
+    await once(socket, 'open')
+    const closed = once(socket, 'close')
+    const [code] = await closed as [number, Buffer]
+    // terminate() closes abnormally; a pong-answering client would survive.
+    expect(code).toBe(1006)
+  })
 })
