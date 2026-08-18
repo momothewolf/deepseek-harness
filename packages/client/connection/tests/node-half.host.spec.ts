@@ -10,7 +10,7 @@ import type { ApiProxy } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { RpcId, type ClientRequest } from '@deepseek-ai/dsh-host-apiproxy/api'
 import type { WebServer, WebRoute, WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
-import { API_PATH, apply, HOST_EVENTS_PATH, inject, MUX_EVENTS_PATH, type HostConnectionHandle } from '../src/index.ts'
+import { API_PATH, apply, Config, HOST_EVENTS_PATH, inject, MUX_EVENTS_PATH, type HostConnectionHandle } from '../src/index.ts'
 
 /** Structural webServer fake recording both route registries. */
 function fakeHttpServer(
@@ -491,5 +491,17 @@ describe('connection node half over a real HTTP server', () => {
       await close()
       await dispose()
     }
+  })
+})
+
+describe('connection Config', () => {
+  it('defaults the heartbeat interval and accepts a positive override', () => {
+    expect(Config({}).heartbeatIntervalMs).toBe(30_000)
+    expect(Config({ heartbeatIntervalMs: 1000 }).heartbeatIntervalMs).toBe(1000)
+  })
+
+  it('rejects a non-positive heartbeat interval', () => {
+    expect(() => Config({ heartbeatIntervalMs: 0 })).toThrow()
+    expect(() => Config({ heartbeatIntervalMs: -5 })).toThrow()
   })
 })
