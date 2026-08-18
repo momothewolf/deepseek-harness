@@ -50,10 +50,11 @@ export const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000
 export interface WebSocketDownlinksOptions {
   /**
    * Heartbeat ping interval in milliseconds. The server pings every accepted
-   * socket on this cadence and terminates any socket that misses two
-   * consecutive pongs — a silently dead connection the browser has not yet
-   * noticed. The resulting close drives the browser's existing reconnect
-   * loop, whose mux-open replay re-delivers still-pending interactions.
+   * socket on this cadence and terminates any socket that fails one pong on
+   * the next tick (a fresh socket gets two ticks of grace from connect) — a
+   * silently dead connection the browser has not yet noticed. The resulting
+   * close drives the browser's existing reconnect loop, whose mux-open replay
+   * re-delivers still-pending interactions.
    */
   heartbeatIntervalMs?: number
 }
@@ -79,10 +80,10 @@ export class WebSocketDownlinks {
     options: WebSocketDownlinksOptions = {},
   ) {
     const intervalMs = options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS
-    // Two-beat grace: tick 1 pings and marks the socket not-alive; tick 2
-    // terminates it unless a pong arrived. A socket that missed one ping
-    // (sleep wake, transient stall) survives; a dead one is reaped on the
-    // second tick.
+    // One-beat grace: tick 1 pings and marks the socket not-alive; a socket
+    // that fails that pong is terminated on the next tick. A fresh socket
+    // gets two ticks of grace from connect; a healthy socket answers every
+    // ping and survives indefinitely.
     this.heartbeat = setInterval(() => {
       for (const socket of this.server.clients) {
         if (!this.alive.has(socket)) {
