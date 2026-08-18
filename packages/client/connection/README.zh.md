@@ -12,7 +12,7 @@ node 半侧在桥接或 upgrade 前守卫 `/api` 下的每个入口（`src/api-r
 
 `/api/events.mux` 与 `/api/events.host` 各接受一条 WebSocket upgrade，并只向浏览器发送对应的 `ServerRequest` 文本消息；客户端不会在这些 socket 上发送业务数据。任一 socket 结束都会使当前 connection generation 失败并重建两条流，连接就绪仍要求两条 socket 均已打开且 `host.describe` HTTP 调用成功。Host teardown 会终止两条 socket、中止各自的 source，并等待 source 清理完成后再返回。普通网络 GET 这些路径会返回 426，不保留 SSE（Server-Sent Events）回退；`toFetchHandler` 的 SSE 编解码只服务进程内同构载体。
 
-每条 socket 都运行服务端心跳：宿主按 `heartbeatIntervalMs` 节奏（默认 30 秒）ping 每个已接受的 socket，连续两次未收到 pong 的连接将被终止。浏览器按 RFC 6455 在协议层自动回 pong，因此客户端无需任何改动；被终止的下行连接会在浏览器触发 `close`，既有重连循环会重新打开两条流，mux-open 重放会把仍未决的提问与审批重新送达。没有心跳时，静默死亡的 socket（睡眠、网络切换、后台标签节流）永远不会被发现，pending 的 `ask_user_question` 可能让会话无限期卡住。
+每条 socket 都运行服务端心跳：宿主按 `heartbeatIntervalMs` 节奏（默认 30 秒）ping 每个已接受的 socket，未收到一次 pong 的 socket 在下一个 tick 被终止（新连接从建立起有 2 个 tick 的宽限）。浏览器按 RFC 6455 在协议层自动回 pong，因此客户端无需任何改动；被终止的下行连接会在浏览器触发 `close`，既有重连循环会重新打开两条流，mux-open 重放会把仍未决的提问与审批重新送达。没有心跳时，静默死亡的 socket（睡眠、网络切换、后台标签节流）永远不会被发现，pending 的 `ask_user_question` 可能让会话无限期卡住。
 
 ## 模型体验
 

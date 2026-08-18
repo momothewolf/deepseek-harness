@@ -61,9 +61,10 @@ export interface ConnectionConfig {
   maxRequestBodyBytes?: number
   /**
    * Heartbeat ping interval (ms) for the two browser event-stream
-   * WebSockets. Sockets missing two consecutive pongs are terminated so the
-   * browser reconnects and the host replays pending interactions; a dead
-   * downlink would otherwise stall an ask_user_question indefinitely.
+   * WebSockets. Sockets that fail one pong are terminated on the next tick
+   * (a fresh socket gets two ticks of grace from connect) so the browser
+   * reconnects and the host replays pending interactions; a dead downlink
+   * would otherwise stall an ask_user_question indefinitely.
    */
   heartbeatIntervalMs?: number
 }

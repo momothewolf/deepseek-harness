@@ -12,15 +12,7 @@ The node half guards every entry under `/api` before bridging or upgrading (`src
 
 `/api/events.mux` and `/api/events.host` each accept a WebSocket upgrade and send only the corresponding `ServerRequest` text messages to the browser; the client sends no application data over these sockets. If either socket ends, the current connection generation fails and rebuilds both streams; readiness still requires both sockets to be open and the `host.describe` HTTP call to succeed. Host teardown terminates both sockets, aborts their sources, and waits for source cleanup before returning. Ordinary network GETs to these paths return 426 with no SSE fallback; `toFetchHandler`'s SSE codec serves only the isomorphic in-process carrier.
 
-Each socket runs a server-side heartbeat: the host pings every accepted
-socket on the `heartbeatIntervalMs` cadence (default 30 s) and terminates
-any socket that misses two consecutive pongs. The browser auto-pongs per
-RFC 6455, so the client needs no change; a terminated downlink fires the
-browser `close`, the existing reconnect loop re-opens both streams, and
-the mux-open replay re-delivers still-pending questions and approvals.
-Without the heartbeat a silently dead socket (sleep, network switch,
-background throttle) would never be detected and a pending
-`ask_user_question` could stall the session indefinitely.
+Each socket runs a server-side heartbeat: the host pings every accepted socket on the `heartbeatIntervalMs` cadence (default 30 s) and terminates any socket that fails one pong on the next tick (a fresh socket gets two ticks of grace from connect). The browser auto-pongs per RFC 6455, so the client needs no change; a terminated downlink fires the browser `close`, the existing reconnect loop re-opens both streams, and the mux-open replay re-delivers still-pending questions and approvals. Without the heartbeat a silently dead socket (sleep, network switch, background throttle) would never be detected and a pending `ask_user_question` could stall the session indefinitely.
 
 ## Model Experience
 
