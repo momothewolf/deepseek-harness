@@ -161,6 +161,27 @@ describe('translate: tool calls', () => {
       { type: 'block-start', index: 1, blockType: 'tool-call' },
     ])
   })
+
+  it('keeps the accumulated name when continuation chunks echo an empty name (gateway poison shape)', async () => {
+    const chunks = await collect(translate(feed(
+      firstChunk,
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_p', type: 'function', function: { name: 'skill', arguments: '' } }] } }] },
+      // Live capture: the gateway re-serializes continuation chunks with
+      // `function: { arguments: ..., name: "" }` instead of omitting the field.
+      { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{"name"', name: '' } }] } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: ': "bom"}', name: '' } }] } }] },
+      { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
+      DONE,
+    )))
+    const end = chunks.find(chunk => chunk.type === 'block-end')
+    expect(end).toEqual({
+      type: 'block-end',
+      index: 0,
+      block: { type: 'tool-call', id: 'call_p', name: 'skill', arguments: '{"name": "bom"}' },
+    })
+    const deltas = chunks.filter(chunk => chunk.type === 'tool-call-delta')
+    expect(deltas.every(delta => delta.name === 'skill')).toBe(true)
+  })
 })
 
 describe('translate: finish and usage handling', () => {
