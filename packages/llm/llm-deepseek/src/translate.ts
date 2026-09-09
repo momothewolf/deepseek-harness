@@ -157,7 +157,11 @@ export async function* translate(payloads: AsyncIterable<string>): AsyncGenerato
           yield { type: 'block-start', index: block.index, blockType: 'tool-call' }
         }
         if (call.id !== undefined) block.callId = call.id
-        if (call.function?.name !== undefined) block.name = call.function.name
+        // Only a non-empty name extends the accumulated one: some gateways
+        // echo `function: { name: "" }` on continuation chunks, and an
+        // undefined-check would let that empty string wipe the name carried
+        // by the first chunk (assembled call then fails as `unknown tool ""`).
+        if (call.function?.name) block.name = call.function.name
         const fragment = call.function?.arguments ?? ''
         block.text += fragment
         yield {
